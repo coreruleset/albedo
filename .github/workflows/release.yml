@@ -8,6 +8,9 @@ on:
 # Declare default permissions as read only.
 permissions: read-all
 
+env:
+  REPO: ghcr.io/coreruleset/albedo
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -95,14 +98,17 @@ jobs:
           files: |
             ./docker-bake.hcl
           targets: default
+          load: true
           push: false
           provenance: true
           sbom: true
 
       - name: Run container
         run: |
-          echo "Starting container"
-          docker run --pull "never" -d --name albedo-test "${REPO}:0"
+          docker images
+          image_ref="$(docker images --filter "reference=${REPO}:*" --format '{{.Repository}}:{{.Tag}}' | head -1)"
+          echo "Starting container ${image_ref}"
+          docker run --pull "never" -d --name albedo-test "${image_ref}"
           docker logs albedo-test
 
       - name: Verify container
