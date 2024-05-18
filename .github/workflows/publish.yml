@@ -43,7 +43,7 @@ jobs:
       - name: Build images
         id: build-and-push
         env:
-          GIT_TAG: ${{ env.GITHUB_REF }}
+          GIT_TAG: ${{ github.ref }}
         uses: docker/bake-action@v4.1.0
         with:
           files: |
