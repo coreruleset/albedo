@@ -101,8 +101,9 @@ jobs:
 
       - name: Run container
         run: |
-          echo "Starting container"
-          docker run --pull "never" -d --name albedo-test "${REPO}:0"
+          image_ref="$(docker images --filter "reference=${REPO}:*" --format '{{.Repository}}:{{.Tag}}' | head -1)"
+          echo "Starting container ${image_ref}"
+          docker run --pull "never" -d --name albedo-test "${image_ref}"
           docker logs albedo-test
 
       - name: Verify container
