@@ -1,5 +1,9 @@
 # Albedo - HTTP reflector and black hole
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/coreruleset/albedo)](https://goreportcard.com/report/github.com/coreruleset/albedo)
+[![Release](https://img.shields.io/github/v/release/coreruleset/albedo.svg?style=flat-square)](https://github.com/coreruleset/albedo/releases/latest)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/coreruleset/albedo/badge)](https://securityscorecards.dev/viewer/?uri=github.com/coreruleset/albedo)
+
 Albedo is a simple HTTP server used as a reverse-proxy backend in testing web application firewalls (WAFs). [go-ftw](https://github.com/coreruleset/go-ftw) relies on Albedo to test WAF rules of responses.
 
 ## Usage
