@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -68,6 +69,31 @@ func (s *serverTestSuite) TestReflect() {
 	reflectedBody, err := io.ReadAll(response.Body)
 	s.Require().NoError(err)
 	s.Equal(responseBodyString, string(reflectedBody))
+}
+
+func (s *serverTestSuite) TestReflect_LogMessage() {
+	logBuffer := &bytes.Buffer{}
+	log.SetOutput(logBuffer)
+
+	server := httptest.NewServer((http.HandlerFunc)(handleReflect))
+	s.T().Cleanup(server.Close)
+
+	spec := &reflectionSpec{
+		LogMessage: "a log message",
+	}
+	body, err := json.Marshal(spec)
+	s.Require().NoError(err)
+	request, err := http.NewRequest("POST", server.URL+"/reflect", bytes.NewReader(body))
+	s.Require().NoError(err)
+	client := http.Client{}
+	_, err = client.Do(request)
+	s.Require().NoError(err)
+
+	output, err := io.ReadAll(logBuffer)
+	s.Require().NoError(err)
+
+	s.Require().NoError(err)
+	s.Contains(string(output), spec.LogMessage)
 }
 
 func (s *serverTestSuite) TestCapabilities() {
