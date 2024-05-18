@@ -8,6 +8,9 @@ on:
 # Declare default permissions as read only.
 permissions: read-all
 
+env:
+  REPO: ghcr.io/coreruleset/albedo
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -98,17 +101,6 @@ jobs:
           push: false
           provenance: true
           sbom: true
-
-      - name: Run container
-        run: |
-          echo "Starting container"
-          docker run --pull "never" -d --name albedo-test "${REPO}:0"
-          docker logs albedo-test
-
-      - name: Verify container
-        run: |
-          [ $(docker inspect albedo-test --format='{{.State.Running}}') = 'true' ]
-
       - name: Sign the images with GitHub OIDC Token
         env:
           METADATA: ${{ steps.build-and-push.outputs.metadata }}
@@ -120,3 +112,23 @@ jobs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+  
+  verify-images:
+    name: Verify images
+    runs-on: ubuntu-latest
+    needs:
+      - publish-images
+    steps:
+      - name: Run container
+        run: |
+          tag="$(sed 's/^v//' <<<"${{ github.ref_name }}")"
+          image_ref="${REPO}:${tag}"
+          echo "Pulling ${image_ref} ..."
+          docker pull "${image_ref}"
+          echo "Starting container ${image_ref} ..."
+          docker run --pull "never" -d --name albedo-test "${image_ref}"
+          docker logs albedo-test
+
+      - name: Verify container
+        run: |
+          [ $(docker inspect albedo-test --format='{{.State.Running}}') = 'true' ]
