@@ -1,0 +1,58 @@
+---
+# This is an example .goreleaser.yml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+project_name: albedo
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod download
+builds:
+  - id: albedo
+    env:
+      - CGO_ENABLED=0
+    binary: albedo
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - darwin_amd64
+      - darwin_arm64
+      - windows_amd64
+archives:
+  - format_overrides:
+      - goos: windows
+        format: zip
+checksum:
+  name_template: '{{ .ProjectName }}-checksums.txt'
+snapshot:
+  name_template: '{{ .Tag }}-next'
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*feat[(\\w)]*:+.*$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*fix[(\\w)]*:+.*$'
+      order: 1
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^docs'
+      - '^test'
+release:
+  prerelease: auto
+nfpms:
+  - id: albedo
+    builds: [albedo]
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    file_name_template: '{{ .ConventionalFileName }}'
+    vendor: OWASP Core Rule Set Project
+    homepage: https://github.com/coreruleset/albedo
+    maintainer: cirques-tellers.0d@icloud.com
+    description: Albedo - HTTP reflector and black hole
+    license: APL2
