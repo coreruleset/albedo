@@ -13,9 +13,10 @@ import (
 )
 
 type reflectionSpec struct {
-	Status  int               `json:"status"`
-	Headers map[string]string `json:"headers"`
-	Body    string            `json:"body"`
+	Status     int               `json:"status"`
+	Headers    map[string]string `json:"headers"`
+	Body       string            `json:"body"`
+	LogMessage string            `json:"logMessage"`
 }
 
 type capabilitiesSpec struct {
@@ -51,9 +52,10 @@ const capabilitiesDescription = `
         This endpoint responds according to the received specification.
         The specification is a JSON document with the following fields:
 
-          status [integer]: the status code to respond with
-          headers [map of header definitions]: the headers to respond with
-          body [base64-encoded string]: body of the response, base64-encoded
+          status      [integer]: the status code to respond with
+          headers     [map of header definitions]: the headers to respond with
+          body        [base64-encoded string]: body of the response, base64-encoded
+          logMessage  [string]: message to log for the request; useful for matching requests to tests
 
         While this endpoint essentially allows for freeform responses, some restrictions apply:
           - responses with status code 1xx don't have a body; if you specify a body together with a 1xx
@@ -79,40 +81,65 @@ func Start(binding string, port int) *http.Server {
 }
 
 // Respond with empty 200 for all requests by default
-func handleDefault(w http.ResponseWriter, r *http.Request) {}
+func handleDefault(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received default request to %s", r.URL)
+}
 
 func handleReflect(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received reflection request")
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Failed to parse request body"))
+		log.Println("Failed to parse request body")
 		return
 	}
 	spec := &reflectionSpec{}
 	if err = json.Unmarshal(body, spec); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Invalid JSON in request body"))
+		log.Println("Invalid JSON in request body")
 		return
 	}
 
+	if spec.LogMessage != "" {
+		log.Println(spec.LogMessage)
+	}
+
 	for name, value := range spec.Headers {
+		log.Printf("Reflecting header '%s':'%s'", name, value)
 		w.Header().Add(name, value)
 	}
-	if spec.Status < 100 || spec.Status >= 600 {
+
+	if spec.Status > 0 && spec.Status < 100 || spec.Status >= 600 {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf("Invalid status code: %d", spec.Status)))
+		log.Printf("Invalid status code: %d", spec.Status)
 		return
 	}
-	w.WriteHeader(spec.Status)
+	status := spec.Status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	log.Printf("Reflecting status '%d'", status)
+	w.WriteHeader(status)
 
 	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(spec.Body))
 	bodyBytes, err := io.ReadAll(decoder)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Invalid base64 encoding of response body"))
+		log.Println("Invalid base64 encoding of response body")
 		return
 
 	}
+
+	bodyString := string(bodyBytes)
+	if len(bodyString) > 200 {
+		bodyString = bodyString[:min(len(bodyString), 200)] + "..."
+	}
+	log.Printf("Reflecting body '%s'", bodyString)
 	w.Write(bodyBytes)
 }
 
