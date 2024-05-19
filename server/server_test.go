@@ -37,7 +37,40 @@ func (s *serverTestSuite) TestDefaultRequest() {
 	s.Equal("0", response.Header["Content-Length"][0])
 }
 
-func (s *serverTestSuite) TestReflect() {
+func (s *serverTestSuite) TestReflect_Body() {
+	server := httptest.NewServer((http.HandlerFunc)(handleReflect))
+	s.T().Cleanup(server.Close)
+
+	responseBody := "a dummy body \t \n\r\r\n\r\n"
+	spec := &reflectionSpec{
+		Status: 202,
+		Headers: map[string]string{
+			"header1":  "value 1",
+			"header_2": "value :2",
+		},
+		Body: responseBody,
+	}
+	body, err := json.Marshal(spec)
+	s.Require().NoError(err)
+	request, err := http.NewRequest("POST", server.URL+"/reflect", bytes.NewReader(body))
+	s.Require().NoError(err)
+	client := http.Client{}
+	response, err := client.Do(request)
+	s.Require().NoError(err)
+
+	s.Equal(spec.Status, response.StatusCode)
+	s.Len(response.Header, 5)
+	s.Contains(response.Header, "Header1")
+	s.Equal("value 1", response.Header["Header1"][0])
+	s.Contains(response.Header, "Header_2")
+	s.Equal("value :2", response.Header["Header_2"][0])
+
+	reflectedBody, err := io.ReadAll(response.Body)
+	s.Require().NoError(err)
+	s.Equal(responseBody, string(reflectedBody))
+}
+
+func (s *serverTestSuite) TestReflect_EncodedBody() {
 	server := httptest.NewServer((http.HandlerFunc)(handleReflect))
 	s.T().Cleanup(server.Close)
 
@@ -49,7 +82,7 @@ func (s *serverTestSuite) TestReflect() {
 			"header1":  "value 1",
 			"header_2": "value :2",
 		},
-		Body: responseBody,
+		EncodedBody: responseBody,
 	}
 	body, err := json.Marshal(spec)
 	s.Require().NoError(err)

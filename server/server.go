@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,10 +14,11 @@ import (
 )
 
 type reflectionSpec struct {
-	Status     int               `json:"status"`
-	Headers    map[string]string `json:"headers"`
-	Body       string            `json:"body"`
-	LogMessage string            `json:"logMessage"`
+	Status      int               `json:"status"`
+	Headers     map[string]string `json:"headers"`
+	Body        string            `json:"body"`
+	EncodedBody string            `json:"encodedBody"`
+	LogMessage  string            `json:"logMessage"`
 }
 
 type capabilitiesSpec struct {
@@ -54,7 +56,8 @@ const capabilitiesDescription = `
 
           status      [integer]: the status code to respond with
           headers     [map of header definitions]: the headers to respond with
-          body        [base64-encoded string]: body of the response, base64-encoded
+          body        [string]: body of the response
+          encodedBody [base64-encoded string]: body of the response, base64-encoded; useful for complex payloads where escaping is difficult
           logMessage  [string]: message to log for the request; useful for matching requests to tests
 
         While this endpoint essentially allows for freeform responses, some restrictions apply:
@@ -125,22 +128,24 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Reflecting status '%d'", status)
 	w.WriteHeader(status)
 
-	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(spec.Body))
-	bodyBytes, err := io.ReadAll(decoder)
+	responseBody, err := decodeBody(spec)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid base64 encoding of response body"))
-		log.Println("Invalid base64 encoding of response body")
+		w.Write([]byte(err.Error()))
+		log.Println(err.Error())
 		return
-
 	}
 
-	bodyString := string(bodyBytes)
-	if len(bodyString) > 200 {
-		bodyString = bodyString[:min(len(bodyString), 200)] + "..."
+	if responseBody == "" {
+		return
 	}
-	log.Printf("Reflecting body '%s'", bodyString)
-	w.Write(bodyBytes)
+
+	responseBodyBytes := []byte(responseBody)
+	if len(responseBody) > 200 {
+		responseBody = responseBody[:min(len(responseBody), 200)] + "..."
+	}
+	log.Printf("Reflecting body '%s'", responseBody)
+	w.Write(responseBodyBytes)
 }
 
 func handleCapabilities(w http.ResponseWriter, r *http.Request) {
@@ -165,4 +170,22 @@ func handleCapabilities(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Failed to marshal capabilities")
 	}
 	w.Write(body)
+}
+
+func decodeBody(spec *reflectionSpec) (string, error) {
+	if spec.Body != "" {
+		return spec.Body, nil
+	}
+
+	if spec.EncodedBody == "" {
+		return "", nil
+	}
+
+	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(spec.EncodedBody))
+	bodyBytes, err := io.ReadAll(decoder)
+	if err != nil {
+		return "", errors.New("invalid base64 encoding of response body")
+
+	}
+	return string(bodyBytes), nil
 }
