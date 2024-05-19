@@ -94,14 +94,20 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Failed to parse request body"))
+		_, err = w.Write([]byte("Failed to parse request body"))
+		if err != nil {
+			log.Printf("Failed to write response body: %s", err.Error())
+		}
 		log.Println("Failed to parse request body")
 		return
 	}
 	spec := &reflectionSpec{}
 	if err = json.Unmarshal(body, spec); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid JSON in request body"))
+		_, err = w.Write([]byte("Invalid JSON in request body"))
+		if err != nil {
+			log.Printf("Failed to write response body: %s", err.Error())
+		}
 		log.Println("Invalid JSON in request body")
 		return
 	}
@@ -117,7 +123,10 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 
 	if spec.Status > 0 && spec.Status < 100 || spec.Status >= 600 {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf("Invalid status code: %d", spec.Status)))
+		_, err = w.Write([]byte(fmt.Sprintf("Invalid status code: %d", spec.Status)))
+		if err != nil {
+			log.Printf("Failed to write response body: %s", err.Error())
+		}
 		log.Printf("Invalid status code: %d", spec.Status)
 		return
 	}
@@ -131,7 +140,10 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 	responseBody, err := decodeBody(spec)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+		_, err = w.Write([]byte(err.Error()))
+		if err != nil {
+			log.Printf("Failed to write response body: %s", err.Error())
+		}
 		log.Println(err.Error())
 		return
 	}
@@ -145,7 +157,10 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 		responseBody = responseBody[:min(len(responseBody), 200)] + "..."
 	}
 	log.Printf("Reflecting body '%s'", responseBody)
-	w.Write(responseBodyBytes)
+	_, err = w.Write(responseBodyBytes)
+	if err != nil {
+		log.Printf("Failed to write response body: %s", err.Error())
+	}
 }
 
 func handleCapabilities(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +184,11 @@ func handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal("Failed to marshal capabilities")
 	}
-	w.Write(body)
+
+	_, err = w.Write(body)
+	if err != nil {
+		log.Printf("Failed to write response body: %s", err.Error())
+	}
 }
 
 func decodeBody(spec *reflectionSpec) (string, error) {
