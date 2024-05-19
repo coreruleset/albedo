@@ -45,10 +45,11 @@ endpoints:
       This endpoint responds according to the received specification.
       The specification is a JSON document with the following fields:
 
-        status      [integer]: the status code to respond with
-        headers     [map of header definitions]: the headers to respond with
-        body        [base64-encoded string]: body of the response, base64-encoded
-        logMessage  [string]: message to log for the request; useful for matching requests to tests
+          status      [integer]: the status code to respond with
+          headers     [map of header definitions]: the headers to respond with
+          body        [string]: body of the response
+          encodedBody [base64-encoded string]: body of the response, base64-encoded; useful for complex payloads where escaping is difficult
+          logMessage  [string]: message to log for the request; useful for matching requests to tests
 
       While this endpoint essentially allows for freeform responses, some restrictions apply:
         - responses with status code 1xx don't have a body; if you specify a body together with a 1xx
