@@ -53,6 +53,6 @@ nfpms:
     file_name_template: '{{ .ConventionalFileName }}'
     vendor: OWASP Core Rule Set Project
     homepage: https://github.com/coreruleset/albedo
-    maintainer: cirques-tellers.0d@icloud.com
+    maintainer: 250711+theseion@users.noreply.github.com
     description: Albedo - HTTP reflector and black hole
     license: APL2
