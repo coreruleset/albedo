@@ -142,7 +142,7 @@ func (s *serverTestSuite) TestCapabilities() {
 	body, err := io.ReadAll(response.Body)
 	s.Require().NoError(err)
 
-	spec := &capabilitiesSpec{}
+	spec := &CapabilitiesSpec{}
 	err = json.Unmarshal(body, spec)
 	s.Require().NoError(err)
 
@@ -175,7 +175,7 @@ func (s *serverTestSuite) TestCapabilities_Quiet() {
 	s.NotContains("contentType", string(body))
 	s.NotContains("description", string(body))
 
-	spec := &capabilitiesSpec{}
+	spec := &CapabilitiesSpec{}
 	err = json.Unmarshal(body, spec)
 	s.Require().NoError(err)
 
