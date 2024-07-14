@@ -21,10 +21,6 @@ type reflectionSpec struct {
 	LogMessage  string            `json:"logMessage"`
 }
 
-type capabilitiesSpec struct {
-	Endpoints []endpoint `json:"endpoints" yaml:"endpoints"`
-}
-
 type endpoint struct {
 	Path        string   `json:"path" yaml:"path"`
 	Methods     []string `json:"methods,omitempty" yaml:"methods"`
@@ -166,14 +162,14 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 func handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 
-	spec := &capabilitiesSpec{}
+	spec := &CapabilitiesSpec{}
 	err := yaml.Unmarshal([]byte(capabilitiesDescription), spec)
 	if err != nil {
 		log.Fatal("Failed to unmarshal capabilities description")
 	}
 
 	if r.URL.Query().Get("quiet") == "true" {
-		quietSpec := &capabilitiesSpec{}
+		quietSpec := &CapabilitiesSpec{}
 		for _, ep := range spec.Endpoints {
 			quietSpec.Endpoints = append(quietSpec.Endpoints, endpoint{Path: ep.Path})
 		}
