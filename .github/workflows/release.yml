@@ -70,7 +70,7 @@ jobs:
           fetch-depth: 1
       
       - name: Install Cosign
-        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
+        uses: sigstore/cosign-installer@4959ce089c160fddf62f7b42464195ba1a56d382 # v3.6.0
 
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
@@ -93,7 +93,7 @@ jobs:
         id: build-and-push
         env:
           GIT_TAG: ${{ github.ref_name }}
-        uses: docker/bake-action@a4d7f0b5b91c14a296d792d4ec53a9db17f02e67 # v5.5.0
+        uses: docker/bake-action@8cea75c238fa977d2ac1fa69d09604b3b740f809 # v5.6.1
         with:
           files: |
             ./docker-bake.hcl
