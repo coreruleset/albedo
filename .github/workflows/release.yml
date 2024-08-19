@@ -93,7 +93,7 @@ jobs:
         id: build-and-push
         env:
           GIT_TAG: ${{ github.ref_name }}
-        uses: docker/bake-action@8cea75c238fa977d2ac1fa69d09604b3b740f809 # v5.6.1
+        uses: docker/bake-action@76cc8060bdff6d632a465001e4cf300684c5472c # v5.7.0
         with:
           files: |
             ./docker-bake.hcl
