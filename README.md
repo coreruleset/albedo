@@ -21,6 +21,36 @@ Flags:
   -p, --port int      port to listen on (default 8080)
 ```
 
+## Usage as a library
+`github.com/coreruleset/albedo/server` package provides a handler that can be used for testing purposes.
+Usage example:
+```go
+package albedo_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/coreruleset/albedo/server"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAlbedo(t *testing.T) {
+	testServer := httptest.NewServer(server.Handler())
+	defer testServer.Close()
+
+	client := http.Client{
+		Timeout: time.Duration(1 * time.Second),
+	}
+
+	_, err := client.Get(testServer.URL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+```
+
 ## Endpoints
 
 ```yaml

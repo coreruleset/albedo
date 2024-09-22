@@ -66,17 +66,24 @@ const capabilitiesDescription = `
 
 func Start(binding string, port int) *http.Server {
 	server := &http.Server{
-		Addr: fmt.Sprintf("%s:%d", binding, port),
+		Addr:    fmt.Sprintf("%s:%d", binding, port),
+		Handler: Handler(),
 	}
-
-	http.HandleFunc("/", handleDefault)
-	http.HandleFunc("/capabilities", handleCapabilities)
-	http.HandleFunc("/capabilities/", handleCapabilities)
-	http.HandleFunc("POST /reflect", handleReflect)
-	http.HandleFunc("POST /reflect/", handleReflect)
 
 	log.Fatal(server.ListenAndServe())
 	return server
+}
+
+func Handler() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", handleDefault)
+	mux.HandleFunc("/capabilities", handleCapabilities)
+	mux.HandleFunc("/capabilities/", handleCapabilities)
+	mux.HandleFunc("POST /reflect", handleReflect)
+	mux.HandleFunc("POST /reflect/", handleReflect)
+
+	return mux
 }
 
 // Respond with empty 200 for all requests by default
