@@ -27,10 +27,10 @@ jobs:
           fetch-depth: 0
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@4574d27a4764455b42196d70a065bc6853246a25 # v3.4.0
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
       -
         name: Set up Go
         uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
@@ -74,11 +74,11 @@ jobs:
 
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@4574d27a4764455b42196d70a065bc6853246a25 # v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
       # https://github.com/docker/setup-buildx-action
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
         with:
           driver-opts: image=moby/buildkit:master
 
@@ -93,7 +93,7 @@ jobs:
         id: build-and-push
         env:
           GIT_TAG: ${{ github.ref_name }}
-        uses: docker/bake-action@4f08b22a19b3133912e9acbf7da9bfa25184a173 # v6.4.0
+        uses: docker/bake-action@4ba453fbc2db7735392b93edf935aaf9b1e8f747 # v6.5.0
         with:
           source: .
           files: |
@@ -128,6 +128,7 @@ jobs:
           docker pull "${image_ref}"
           echo "Starting container ${image_ref} ..."
           docker run --pull "never" -d --name albedo-test "${image_ref}"
+          sleep 10
           docker logs albedo-test
 
       - name: Verify container
