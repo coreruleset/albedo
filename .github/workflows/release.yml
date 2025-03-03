@@ -74,7 +74,7 @@ jobs:
 
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
       # https://github.com/docker/setup-buildx-action
       - name: Set up Docker Buildx
@@ -128,6 +128,7 @@ jobs:
           docker pull "${image_ref}"
           echo "Starting container ${image_ref} ..."
           docker run --pull "never" -d --name albedo-test "${image_ref}"
+          sleep 10
           docker logs albedo-test
 
       - name: Verify container
