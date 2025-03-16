@@ -1,0 +1,51 @@
+endpoints:
+  - path: "/*"
+    methods: [any]
+    contentType: any
+    description: |
+      Requests to any URL that is not defined as an endpoint are accepted if they are valid.
+      The response to any such request will be a status 200 without a body.
+  - path: /capabilities
+    methods: [GET]
+    contentType: "-"
+    description: | 
+      Returns a JSON document describing the capabilities of albedo, i.e., available endpoints and their functions.
+      If the query parameter 'quiet' is set to 'true', the response will only contain the path property for each
+      endpoint.
+  - path: /reflect
+    methods: [POST]
+    contentType: application/json
+    description: |
+      This endpoint responds according to the received specification.
+      The specification is a JSON document with the following fields:
+
+        status      [integer]: the status code to respond with
+        headers     [map of header definitions]: the headers to respond with
+        body        [string]: body of the response
+        encodedBody [base64-encoded string]: body of the response, base64-encoded; useful for complex payloads where escaping is difficult
+        logMessage  [string]: message to log for the request; useful for matching requests to tests
+
+      While this endpoint essentially allows for freeform responses, some restrictions apply:
+        - responses with status code 1xx don't have a body; if you specify a body together with a 1xx
+          status code, the behavior is undefined
+        - response status codes must lie in the range of [100,599]
+        - the names and values of headers must be valid according to the HTTP specification;
+          invalid headers will be dropped
+  - path: /configure_reflection
+    methods: [POST]
+    contentType: application/json
+    description: |
+      This endpoint configures other endpoints to respond as described by the received specification.
+      Any configured endpoint will behave as if it were the "/reflect" endpoint and will retain its configuration.
+      Endpoints can be overridden with new configurations.
+
+      The specification is a JSON document with the same fields as in the specification for "/reflect", with the following additions:
+
+        endpoints [list of endpoints]: endpoints to configure; an endpoint has the following fields:
+                  method                  [string]: HTTP method to match
+                  url                     [string]: URL of the endpoint, including query and fragment
+  - path: /reset
+    methods: [PUT]
+    contentType: any
+    description: |
+      Discards endpoint configurations previously created via "/configure_reflection"
