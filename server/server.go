@@ -190,7 +190,7 @@ func doReflect(w http.ResponseWriter, r *http.Request, spec *reflectionSpec) {
 
 	if spec.Status > 0 && spec.Status < 100 || spec.Status >= 600 {
 		w.WriteHeader(http.StatusBadRequest)
-		_, err := w.Write([]byte(fmt.Sprintf("Invalid status code: %d", spec.Status)))
+		_, err := fmt.Fprintf(w, "Invalid status code: %d", spec.Status)
 		if err != nil {
 			log.Printf("Failed to write response body: %s", err.Error())
 		}
