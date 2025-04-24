@@ -17,7 +17,7 @@ type serverTestSuite struct {
 	suite.Suite
 }
 
-func TestCheckLogsTestSuite(t *testing.T) {
+func TestServerTestSuite(t *testing.T) {
 	suite.Run(t, new(serverTestSuite))
 }
 
