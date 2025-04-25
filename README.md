@@ -19,6 +19,7 @@ Flags:
   -b, --bind string   address to bind to (default "0.0.0.0")
   -h, --help          help for albedo
   -p, --port int      port to listen on (default 8080)
+      --debug         log debug information
 ```
 
 ## Usage as a library
