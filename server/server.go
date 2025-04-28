@@ -12,6 +12,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -49,6 +50,8 @@ func Handler() http.Handler {
 	mux.HandleFunc("POST /configure_reflection/", handleConfigureReflection)
 	mux.HandleFunc("PUT /reset", handleReset)
 	mux.HandleFunc("PUT /reset/", handleReset)
+	mux.HandleFunc("/inspect", handleInspect)
+	mux.HandleFunc("/inspect/", handleInspect)
 
 	return mux
 }
@@ -167,6 +170,56 @@ func handleReset(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleInspect(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Received inspection request")
+
+	logArgs := []any{
+		"protocol", r.Proto,
+		"verb", r.Method,
+	}
+
+	keys := []string{}
+	for key := range r.Header {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	for _, key := range keys {
+		for _, value := range r.Header.Values(key) {
+			logArgs = append(logArgs, key, value)
+		}
+	}
+	slog.Info("Request information", logArgs...)
+
+	if r.ContentLength == 0 {
+		slog.Info("Request body is empty")
+		return
+	}
+
+	bodyLength := 0
+	var bodyBuffer []byte
+	if r.ContentLength == -1 {
+		// 10 MB buffer
+		bodyBuffer = make([]byte, 10*1024*1024*1024)
+	} else {
+		bodyBuffer = make([]byte, r.ContentLength)
+	}
+	for {
+		read, err := r.Body.Read(bodyBuffer)
+		if errors.Is(err, io.EOF) {
+			bodyLength += read
+			break
+		} else if err != nil {
+			slog.Warn("failed to read body", "error", err)
+			return
+		}
+		bodyLength += read
+	}
+
+	size, unit := toHumanReadableMemorySize(uint64(bodyLength))
+	slog.Info(fmt.Sprintf("Body length: %d%s (%d)", size, unit, bodyLength))
+}
+
 func decodeBody(spec *reflectionSpec) (string, error) {
 	slog.Debug("Decoding body")
 
@@ -267,8 +320,9 @@ func getCapabilities() *CapabilitiesSpec {
 func toHumanReadableMemorySize(numBytes uint64) (uint64, string) {
 	units := []string{"B", "KB", "MB", "GB"}
 	unit := 0
-	for numBytes > 10000 {
-		numBytes /= 1000
+	unitSize := numBytes
+	for unitSize > 10000 {
+		unitSize /= 1000
 		unit++
 	}
 	var selectedUnit string
@@ -277,5 +331,5 @@ func toHumanReadableMemorySize(numBytes uint64) (uint64, string) {
 	} else {
 		selectedUnit = "(too big...)"
 	}
-	return numBytes, selectedUnit
+	return unitSize, selectedUnit
 }
