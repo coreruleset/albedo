@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -8,8 +10,9 @@ import (
 	"hash/maphash"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
-	"os"
+	"slices"
 	"strings"
 	"sync"
 
@@ -21,14 +24,18 @@ var dynamicEndpointMutex = sync.RWMutex{}
 var dynamicEndpoints = map[uint64]reflectionSpec{}
 var dynamicEndpointsHash = maphash.Hash{}
 
-func Start(binding string, port int) *http.Server {
+//go:embed capabilities.yaml
+var capabilitiesDescription []byte
+
+func Start(binding string, port int) {
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", binding, port),
 		Handler: Handler(),
 	}
 
-	log.Fatal(server.ListenAndServe())
-	return server
+	slog.Debug("Starting server")
+	err := server.ListenAndServe()
+	slog.Info("Server stopped", "exit-status", err)
 }
 
 func Handler() http.Handler {
@@ -43,6 +50,8 @@ func Handler() http.Handler {
 	mux.HandleFunc("POST /configure_reflection/", handleConfigureReflection)
 	mux.HandleFunc("PUT /reset", handleReset)
 	mux.HandleFunc("PUT /reset/", handleReset)
+	mux.HandleFunc("/inspect", handleInspect)
+	mux.HandleFunc("/inspect/", handleInspect)
 
 	return mux
 }
@@ -59,31 +68,38 @@ func handleDefault(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		doReflect(w, r, &reflectionSpec)
 	} else {
-		log.Printf("Received default request to %s", r.URL)
+		slog.Info(fmt.Sprintf("Received default request to %s", r.URL))
 	}
 }
 
 func handleReflect(w http.ResponseWriter, r *http.Request) {
-	log.Println("Received reflection request")
+	slog.Info("Received reflection request")
 
+	slog.Debug("Reading body")
 	body, err := io.ReadAll(r.Body)
+	if slog.Default().Enabled(context.TODO(), slog.LevelDebug) {
+		numBytes, unit := toHumanReadableMemorySize(uint64(len(body)))
+		slog.Debug(fmt.Sprintf("Body size: %d%s", numBytes, unit))
+	}
+
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte("Failed to parse request body"))
 		if err != nil {
-			log.Printf("Failed to write response body: %s", err.Error())
+			slog.Warn("Failed to write response body", "error", err.Error())
 		}
-		log.Println("Failed to parse request body")
+		slog.Warn("Failed to parse request body")
 		return
 	}
+	slog.Debug("Parsing reflection specification")
 	spec := &reflectionSpec{}
 	if err = json.Unmarshal(body, spec); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte("Invalid JSON in request body"))
 		if err != nil {
-			log.Printf("Failed to write response body: %s", err.Error())
+			slog.Warn("Failed to write response body", "error", err.Error())
 		}
-		log.Println("Invalid JSON in request body")
+		slog.Warn("Invalid JSON in request body")
 		return
 	}
 
@@ -92,6 +108,7 @@ func handleReflect(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Received capabilities request")
 	w.Header().Add("Content-Type", "application/json")
 
 	spec := getCapabilities()
@@ -110,19 +127,21 @@ func handleCapabilities(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write(body)
 	if err != nil {
-		log.Printf("Failed to write response body: %s", err.Error())
+		slog.Warn("Failed to write response body", "error", err.Error())
 	}
 }
 
 func handleConfigureReflection(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Received configuration request")
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte("Failed to parse request body"))
 		if err != nil {
-			log.Printf("Failed to write response body: %s", err.Error())
+			slog.Warn("Failed to write response body", "error", err.Error())
 		}
-		log.Println("Failed to parse request body")
+		slog.Info("Failed to parse request body")
 		return
 	}
 	spec := &configureReflectionSpec{}
@@ -130,9 +149,9 @@ func handleConfigureReflection(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte("Invalid JSON in request body"))
 		if err != nil {
-			log.Printf("Failed to write response body: %s", err.Error())
+			slog.Warn("Failed to write response body", "error", err.Error())
 		}
-		log.Println("Invalid JSON in request body")
+		slog.Info("Invalid JSON in request body")
 		return
 	}
 
@@ -145,13 +164,65 @@ func handleConfigureReflection(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleReset(w http.ResponseWriter, r *http.Request) {
-	log.Println("Received reset request. Discarding all endpoint configurations now")
+	slog.Info("Received reset request. Discarding all endpoint configurations now")
 	for k := range dynamicEndpoints {
 		delete(dynamicEndpoints, k)
 	}
 }
 
+func handleInspect(w http.ResponseWriter, r *http.Request) {
+	slog.Info("Received inspection request")
+
+	logArgs := []any{
+		"protocol", r.Proto,
+		"verb", r.Method,
+	}
+
+	keys := []string{}
+	for key := range r.Header {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	for _, key := range keys {
+		for _, value := range r.Header.Values(key) {
+			logArgs = append(logArgs, key, value)
+		}
+	}
+	slog.Info("Request information", logArgs...)
+
+	if r.ContentLength == 0 {
+		slog.Info("Request body is empty")
+		return
+	}
+
+	bodyLength := 0
+	var bodyBuffer []byte
+	if r.ContentLength == -1 {
+		// 10 MB buffer
+		bodyBuffer = make([]byte, 10*1024*1024*1024)
+	} else {
+		bodyBuffer = make([]byte, r.ContentLength)
+	}
+	for {
+		read, err := r.Body.Read(bodyBuffer)
+		if errors.Is(err, io.EOF) {
+			bodyLength += read
+			break
+		} else if err != nil {
+			slog.Warn("failed to read body", "error", err)
+			return
+		}
+		bodyLength += read
+	}
+
+	size, unit := toHumanReadableMemorySize(uint64(bodyLength))
+	slog.Info(fmt.Sprintf("Body length: %d%s (%d)", size, unit, bodyLength))
+}
+
 func decodeBody(spec *reflectionSpec) (string, error) {
+	slog.Debug("Decoding body")
+
 	if spec.Body != "" {
 		return spec.Body, nil
 	}
@@ -177,14 +248,14 @@ func computeEndpointKey(method string, url string) uint64 {
 }
 
 func doReflect(w http.ResponseWriter, r *http.Request, spec *reflectionSpec) {
-	log.Printf("Reflecting response for '%s' request to '%s'", r.Method, r.RequestURI)
+	slog.Info(fmt.Sprintf("Reflecting response for '%s' request to '%s'", r.Method, r.RequestURI))
 
 	if spec.LogMessage != "" {
-		log.Println(spec.LogMessage)
+		slog.Info(spec.LogMessage)
 	}
 
 	for name, value := range spec.Headers {
-		log.Printf("Reflecting header '%s':'%s'", name, value)
+		slog.Info(fmt.Sprintf("Reflecting header '%s':'%s'", name, value))
 		w.Header().Add(name, value)
 	}
 
@@ -192,16 +263,16 @@ func doReflect(w http.ResponseWriter, r *http.Request, spec *reflectionSpec) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err := fmt.Fprintf(w, "Invalid status code: %d", spec.Status)
 		if err != nil {
-			log.Printf("Failed to write response body: %s", err.Error())
+			slog.Warn("Failed to write response body", "error", err.Error())
 		}
-		log.Printf("Invalid status code: %d", spec.Status)
+		slog.Info(fmt.Sprintf("Invalid status code: %d", spec.Status))
 		return
 	}
 	status := spec.Status
 	if status == 0 {
 		status = http.StatusOK
 	}
-	log.Printf("Reflecting status '%d'", status)
+	slog.Info(fmt.Sprintf("Reflecting status '%d'", status))
 	w.WriteHeader(status)
 
 	responseBody, err := decodeBody(spec)
@@ -209,9 +280,9 @@ func doReflect(w http.ResponseWriter, r *http.Request, spec *reflectionSpec) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write([]byte(err.Error()))
 		if err != nil {
-			log.Printf("Failed to write response body: %s", err.Error())
+			slog.Warn("Failed to write response body", "error", err.Error())
 		}
-		log.Println(err.Error())
+		slog.Info(err.Error())
 		return
 	}
 
@@ -223,10 +294,10 @@ func doReflect(w http.ResponseWriter, r *http.Request, spec *reflectionSpec) {
 	if len(responseBody) > 200 {
 		responseBody = responseBody[:min(len(responseBody), 200)] + "..."
 	}
-	log.Printf("Reflecting body '%s'", responseBody)
+	slog.Info(fmt.Sprintf("Reflecting body '%s'", responseBody))
 	_, err = w.Write(responseBodyBytes)
 	if err != nil {
-		log.Printf("Failed to write response body: %s", err.Error())
+		slog.Warn("Failed to write response body", "error", err.Error())
 	}
 }
 
@@ -236,20 +307,29 @@ func getCapabilities() *CapabilitiesSpec {
 	}
 
 	spec := &CapabilitiesSpec{}
-	file, err := os.Open("capabilities.yaml")
+	err := yaml.Unmarshal(capabilitiesDescription, spec)
 	if err != nil {
-		log.Fatal("Failed to open capabilities description")
-	}
-	description, err := io.ReadAll(file)
-	if err != nil {
-		log.Fatal("Failed to read capabilities description")
-	}
-	err = yaml.Unmarshal(description, spec)
-	if err != nil {
-		log.Fatal("Failed to unmarshal capabilities description")
+		slog.Error("Failed to unmarshal capabilities description")
 	}
 
 	capabilities = spec
 
 	return capabilities
+}
+
+func toHumanReadableMemorySize(numBytes uint64) (uint64, string) {
+	units := []string{"B", "KB", "MB", "GB"}
+	unit := 0
+	unitSize := numBytes
+	for unitSize > 10000 {
+		unitSize /= 1000
+		unit++
+	}
+	var selectedUnit string
+	if unit < len(units) {
+		selectedUnit = units[unit]
+	} else {
+		selectedUnit = "(too big...)"
+	}
+	return unitSize, selectedUnit
 }

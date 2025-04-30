@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"log/slog"
+	"os"
 
 	"github.com/coreruleset/albedo/server"
 	"github.com/spf13/cobra"
@@ -18,10 +20,9 @@ func NewRootCommand() *cobra.Command {
 		Short: "HTTP reflector and black hole",
 		RunE:  runE,
 	}
-	port := new(int)
-	binding := new(string)
-	rootCmd.PersistentFlags().IntVarP(port, "port", "p", 8080, "port to listen on")
-	rootCmd.PersistentFlags().StringVarP(binding, "bind", "b", "0.0.0.0", "address to bind to")
+	rootCmd.PersistentFlags().IntP("port", "p", 8080, "port to listen on")
+	rootCmd.PersistentFlags().StringP("bind", "b", "0.0.0.0", "address to bind to")
+	rootCmd.PersistentFlags().Bool("debug", false, "Log debugging information")
 
 	return rootCmd
 }
@@ -29,8 +30,13 @@ func NewRootCommand() *cobra.Command {
 func runE(cmd *cobra.Command, _ []string) error {
 	port, _ := cmd.Flags().GetInt("port")
 	binding, _ := cmd.Flags().GetString("bind")
+	debug, _ := cmd.Flags().GetBool("debug")
+	if debug {
+		handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+		logger := slog.New(handler)
+		slog.SetDefault(logger)
+	}
 
-	_ = server.Start(binding, port)
-
+	server.Start(binding, port)
 	return nil
 }

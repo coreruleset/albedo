@@ -19,6 +19,7 @@ Flags:
   -b, --bind string   address to bind to (default "0.0.0.0")
   -h, --help          help for albedo
   -p, --port int      port to listen on (default 8080)
+      --debug         log debug information
 ```
 
 ## Usage as a library
@@ -87,4 +88,9 @@ endpoints:
         - response status codes must lie in the range of [100,599]
         - the names and values of headers must be valid according to the HTTP specification;
           invalid headers will be dropped
+  - path: /inspect
+    methods: [any]
+    contentType: any
+    description: |
+      Logs debug information about the received request, such as headers and body size.
 ```

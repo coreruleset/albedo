@@ -17,7 +17,7 @@ type serverTestSuite struct {
 	suite.Suite
 }
 
-func TestCheckLogsTestSuite(t *testing.T) {
+func TestServerTestSuite(t *testing.T) {
 	suite.Run(t, new(serverTestSuite))
 }
 
@@ -146,12 +146,13 @@ func (s *serverTestSuite) TestCapabilities() {
 	err = json.Unmarshal(body, spec)
 	s.Require().NoError(err)
 
-	s.Len(spec.Endpoints, 5)
+	s.Len(spec.Endpoints, 6)
 	s.Equal("/*", spec.Endpoints[0].Path)
 	s.Equal("/capabilities", spec.Endpoints[1].Path)
 	s.Equal("/reflect", spec.Endpoints[2].Path)
 	s.Equal("/configure_reflection", spec.Endpoints[3].Path)
 	s.Equal("/reset", spec.Endpoints[4].Path)
+	s.Equal("/inspect", spec.Endpoints[5].Path)
 
 	for _, ep := range spec.Endpoints {
 		s.NotEmpty(ep.ContentType)
@@ -181,12 +182,13 @@ func (s *serverTestSuite) TestCapabilities_Quiet() {
 	err = json.Unmarshal(body, spec)
 	s.Require().NoError(err)
 
-	s.Len(spec.Endpoints, 5)
+	s.Len(spec.Endpoints, 6)
 	s.Equal("/*", spec.Endpoints[0].Path)
 	s.Equal("/capabilities", spec.Endpoints[1].Path)
 	s.Equal("/reflect", spec.Endpoints[2].Path)
 	s.Equal("/configure_reflection", spec.Endpoints[3].Path)
 	s.Equal("/reset", spec.Endpoints[4].Path)
+	s.Equal("/inspect", spec.Endpoints[5].Path)
 }
 
 func (s *serverTestSuite) TestConfigureReflection() {

@@ -49,3 +49,8 @@ endpoints:
     contentType: any
     description: |
       Discards endpoint configurations previously created via "/configure_reflection"
+  - path: /inspect
+    methods: [any]
+    contentType: any
+    description: |
+      Logs debug information about the received request, such as headers and body size.
