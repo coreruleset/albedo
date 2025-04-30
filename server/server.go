@@ -199,8 +199,8 @@ func handleInspect(w http.ResponseWriter, r *http.Request) {
 	bodyLength := 0
 	var bodyBuffer []byte
 	if r.ContentLength == -1 {
-		// 10 MB buffer
-		bodyBuffer = make([]byte, 10*1024*1024*1024)
+		// 1 MB buffer
+		bodyBuffer = make([]byte, 1024*1024*1024)
 	} else {
 		bodyBuffer = make([]byte, r.ContentLength)
 	}
