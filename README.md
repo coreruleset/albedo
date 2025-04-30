@@ -88,4 +88,9 @@ endpoints:
         - response status codes must lie in the range of [100,599]
         - the names and values of headers must be valid according to the HTTP specification;
           invalid headers will be dropped
+  - path: /inspect
+    methods: [any]
+    contentType: any
+    description: |
+      Logs debug information about the received request, such as headers and body size.
 ```
