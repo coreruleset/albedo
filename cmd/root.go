@@ -23,6 +23,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().IntP("port", "p", 8080, "port to listen on")
 	rootCmd.PersistentFlags().StringP("bind", "b", "0.0.0.0", "address to bind to")
 	rootCmd.PersistentFlags().Bool("debug", false, "Log debugging information")
+	rootCmd.PersistentFlags().Bool("json", false, "Use JSON log format instead of text")
 
 	return rootCmd
 }
@@ -31,11 +32,19 @@ func runE(cmd *cobra.Command, _ []string) error {
 	port, _ := cmd.Flags().GetInt("port")
 	binding, _ := cmd.Flags().GetString("bind")
 	debug, _ := cmd.Flags().GetBool("debug")
+	jsonLogFormat, _ := cmd.Flags().GetBool("json")
+	logLevel := slog.LevelInfo
 	if debug {
-		handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-		logger := slog.New(handler)
-		slog.SetDefault(logger)
+		logLevel = slog.LevelDebug
 	}
+	var handler slog.Handler
+	if jsonLogFormat {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	}
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
 
 	server.Start(binding, port)
 	return nil
