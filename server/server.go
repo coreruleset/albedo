@@ -173,51 +173,38 @@ func handleReset(w http.ResponseWriter, r *http.Request) {
 func handleInspect(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Received inspection request")
 
-	logArgs := []any{
-		"protocol", r.Proto,
-		"verb", r.Method,
-	}
-
+	logAttrs := []any{slog.String("protocol", r.Proto)}
+	logAttrs = append(logAttrs, slog.String("verb", r.Method))
+	reqURLElements := strings.Split(r.URL.String(),"/inspect")
+	logAttrs = append(logAttrs, slog.String("endpoint", fmt.Sprintf("/%s", strings.TrimPrefix(reqURLElements[len(reqURLElements)-1], "/"))))
+	headersAttrs := []any{}
 	keys := []string{}
 	for key := range r.Header {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
-
 	for _, key := range keys {
 		for _, value := range r.Header.Values(key) {
-			logArgs = append(logArgs, key, value)
+			headersAttrs = append(headersAttrs, slog.String(key, value))
 		}
 	}
-	slog.Info("Request information", logArgs...)
+	logAttrs = append(logAttrs, slog.Group("headers", headersAttrs...))
 
-	if r.ContentLength == 0 {
-		slog.Info("Request body is empty")
-		return
-	}
-
-	bodyLength := 0
-	var bodyBuffer []byte
-	if r.ContentLength == -1 {
-		// 1 MB buffer
-		bodyBuffer = make([]byte, 1024*1024*1024)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		slog.Warn("failed to read body", "error", err)
 	} else {
-		bodyBuffer = make([]byte, r.ContentLength)
-	}
-	for {
-		read, err := r.Body.Read(bodyBuffer)
-		if errors.Is(err, io.EOF) {
-			bodyLength += read
-			break
-		} else if err != nil {
-			slog.Warn("failed to read body", "error", err)
-			return
-		}
-		bodyLength += read
-	}
+		bodyAttrs := []any{}
+		numBytes, unit := toHumanReadableMemorySize(uint64(len(body)))
+		bodyLengthAttrs := []any{slog.Uint64("value", numBytes), slog.String("unit", unit)}
+		bodyAttrs = append(bodyAttrs, slog.Group("length", bodyLengthAttrs...))
 
-	size, unit := toHumanReadableMemorySize(uint64(bodyLength))
-	slog.Info(fmt.Sprintf("Body length: %d%s (%d)", size, unit, bodyLength))
+		if slog.Default().Enabled(context.TODO(), slog.LevelDebug) {
+			bodyAttrs = append(bodyAttrs, slog.String("content", string(body)))
+		}
+		logAttrs = append(logAttrs, slog.Group("body", bodyAttrs...))
+	}
+	slog.Default().LogAttrs(context.TODO(), slog.LevelInfo, "Request information", slog.Group("request", logAttrs...))
 }
 
 func decodeBody(spec *reflectionSpec) (string, error) {

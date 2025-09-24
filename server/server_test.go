@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -360,4 +362,170 @@ func (s *serverTestSuite) TestReset() {
 	response, err = client.Do(request)
 	s.Require().NoError(err)
 	s.Equal(200, response.StatusCode)
+}
+
+func (s *serverTestSuite) TestInspect() {
+	server := httptest.NewServer((http.HandlerFunc)(handleInspect))
+	s.T().Cleanup(server.Close)
+
+	client := http.Client{}
+
+	// Test 1: Basic GET request
+	response, err := client.Get(server.URL + "/inspect")
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+	body, err := io.ReadAll(response.Body)
+	s.Require().NoError(err)
+	s.Empty(body)
+
+	// Test 2: POST request with body
+	requestBody := "test request body content"
+	request, err := http.NewRequest("POST", server.URL+"/inspect", bytes.NewReader([]byte(requestBody)))
+	s.Require().NoError(err)
+	response, err = client.Do(request)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+	body, err = io.ReadAll(response.Body)
+	s.Require().NoError(err)
+	s.Empty(body)
+
+	// Test 3: Request with various headers
+	request, err = http.NewRequest("GET", server.URL+"/inspect", nil)
+	s.Require().NoError(err)
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Authorization", "Bearer token123")
+	request.Header.Add("User-Agent", "test-client/1.0")
+	request.Header.Add("X-Custom-Header", "custom-value")
+	response, err = client.Do(request)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+	body, err = io.ReadAll(response.Body)
+	s.Require().NoError(err)
+	s.Empty(body)
+
+	// Test 4: Different endpoint paths
+	endpoints := []string{
+		"/inspect",
+		"/inspect/",
+		"/inspect/test",
+		"/inspect/test/path",
+		"/inspect/test?query=value",
+	}
+	for _, endpoint := range endpoints {
+		request, err := http.NewRequest("GET", server.URL+endpoint, nil)
+		s.Require().NoError(err)
+		response, err := client.Do(request)
+		s.Require().NoError(err)
+		s.Equal(http.StatusOK, response.StatusCode)
+		body, err := io.ReadAll(response.Body)
+		s.Require().NoError(err)
+		s.Empty(body)
+	}
+
+	// Test 5: Different HTTP methods
+	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
+	for _, method := range methods {
+		request, err := http.NewRequest(method, server.URL+"/inspect", nil)
+		s.Require().NoError(err)
+		response, err := client.Do(request)
+		s.Require().NoError(err)
+		s.Equal(http.StatusOK, response.StatusCode)
+		body, err := io.ReadAll(response.Body)
+		s.Require().NoError(err)
+		s.Empty(body)
+	}
+
+	// Test 6: Large body (>200 characters to test truncation in logs)
+	largeBody := strings.Repeat("This is a test body content. ", 20) // ~600 characters
+	request, err = http.NewRequest("POST", server.URL+"/inspect", bytes.NewReader([]byte(largeBody)))
+	s.Require().NoError(err)
+	response, err = client.Do(request)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+	body, err = io.ReadAll(response.Body)
+	s.Require().NoError(err)
+	s.Empty(body)
+}
+
+func (s *serverTestSuite) TestInspect_LogContent() {
+	// Create a custom log handler to capture log output
+	var logOutput bytes.Buffer
+	handler := slog.NewTextHandler(&logOutput, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	logger := slog.New(handler)
+
+	// Store the original default logger and restore it after the test
+	originalLogger := slog.Default()
+	slog.SetDefault(logger)
+	defer slog.SetDefault(originalLogger)
+
+	server := httptest.NewServer((http.HandlerFunc)(handleInspect))
+	s.T().Cleanup(server.Close)
+
+	client := http.Client{}
+
+	// Test 1: Basic GET request and verify log content
+	response, err := client.Get(server.URL + "/inspect")
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+
+	// Check log output
+	logContent := logOutput.String()
+	s.Contains(logContent, "level=INFO msg=\"Received inspection request\"")
+	s.Contains(logContent, "level=INFO msg=\"Request information\"")
+	s.Contains(logContent, "request.protocol=HTTP/1.1")
+	s.Contains(logContent, "request.verb=GET")
+	s.Contains(logContent, "request.endpoint=/")
+	s.Contains(logContent, "request.headers.User-Agent=Go-http-client/1.1")
+	s.Contains(logContent, "request.body.length.value=0")
+	s.Contains(logContent, "request.body.length.unit=B")
+
+	// Clear log buffer for next test
+	logOutput.Reset()
+
+	// Test 2: POST request with body and custom headers
+	requestBody := "test request body content"
+	request, err := http.NewRequest("POST", server.URL+"/inspect", bytes.NewReader([]byte(requestBody)))
+	s.Require().NoError(err)
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Authorization", "Bearer token123")
+	request.Header.Add("X-Custom-Header", "custom-value")
+
+	response, err = client.Do(request)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+
+	// Check log output for POST request
+	logContent = logOutput.String()
+	s.Contains(logContent, "level=INFO msg=\"Received inspection request\"")
+	s.Contains(logContent, "level=INFO msg=\"Request information\"")
+	s.Contains(logContent, "request.protocol=HTTP/1.1")
+	s.Contains(logContent, "request.verb=POST")
+	s.Contains(logContent, "request.endpoint=/")
+	s.Contains(logContent, "request.headers.Content-Type=application/json")
+	s.Contains(logContent, "request.headers.Authorization=\"Bearer token123\"")
+	s.Contains(logContent, "request.headers.X-Custom-Header=custom-value")
+	s.Contains(logContent, "request.body.length.value=25")
+	s.Contains(logContent, "request.body.length.unit=B")
+
+	// Clear log buffer for next test
+	logOutput.Reset()
+
+	// Test 3: Request with different endpoint path
+	request, err = http.NewRequest("GET", server.URL+"/inspect/test/path", nil)
+	s.Require().NoError(err)
+	response, err = client.Do(request)
+	s.Require().NoError(err)
+	s.Equal(http.StatusOK, response.StatusCode)
+
+	// Check log output for different endpoint
+	logContent = logOutput.String()
+	s.Contains(logContent, "level=INFO msg=\"Received inspection request\"")
+	s.Contains(logContent, "level=INFO msg=\"Request information\"")
+	s.Contains(logContent, "request.protocol=HTTP/1.1")
+	s.Contains(logContent, "request.verb=GET")
+	s.Contains(logContent, "request.endpoint=/test/path")
+	s.Contains(logContent, "request.body.length.value=0")
+	s.Contains(logContent, "request.body.length.unit=B")
 }
