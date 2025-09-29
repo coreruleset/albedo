@@ -92,5 +92,6 @@ endpoints:
     methods: [any]
     contentType: any
     description: |
-      Logs debug information about the received request, such as headers and body size.
+      Logs information about the received request, such as headers and body size.
+      Body content is logged as well when debug log is enabled
 ```
