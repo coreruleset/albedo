@@ -20,6 +20,7 @@ Flags:
   -h, --help          help for albedo
   -p, --port int      port to listen on (default 8080)
       --debug         log debug information
+      --json          format logs as JSON
 ```
 
 ## Usage as a library
