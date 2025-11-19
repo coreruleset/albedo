@@ -77,11 +77,11 @@ endpoints:
       This endpoint responds according to the received specification.
       The specification is a JSON document with the following fields:
 
-          status      [integer]: the status code to respond with
-          headers     [map of header definitions]: the headers to respond with
-          body        [string]: body of the response
-          encodedBody [base64-encoded string]: body of the response, base64-encoded; useful for complex payloads where escaping is difficult
-          logMessage  [string]: message to log for the request; useful for matching requests to tests
+        status      [integer]: the status code to respond with
+        headers     [map of header definitions]: the headers to respond with
+        body        [string]: body of the response
+        encodedBody [base64-encoded string]: body of the response, base64-encoded; useful for complex payloads where escaping is difficult
+        logMessage  [string]: message to log for the request; useful for matching requests to tests
 
       While this endpoint essentially allows for freeform responses, some restrictions apply:
         - responses with status code 1xx don't have a body; if you specify a body together with a 1xx
@@ -89,10 +89,28 @@ endpoints:
         - response status codes must lie in the range of [100,599]
         - the names and values of headers must be valid according to the HTTP specification;
           invalid headers will be dropped
+  - path: /configure_reflection
+    methods: [POST]
+    contentType: application/json
+    description: |
+      This endpoint configures other endpoints to respond as described by the received specification.
+      Any configured endpoint will behave as if it were the "/reflect" endpoint and will retain its configuration.
+      Endpoints can be overridden with new configurations.
+
+      The specification is a JSON document with the same fields as in the specification for "/reflect", with the following additions:
+
+        endpoints [list of endpoints]: endpoints to configure; an endpoint has the following fields:
+                  method                  [string]: HTTP method to match
+                  url                     [string]: URL of the endpoint, including query and fragment
+  - path: /reset
+    methods: [PUT]
+    contentType: any
+    description: |
+      Discards endpoint configurations previously created via "/configure_reflection"
   - path: /inspect
     methods: [any]
     contentType: any
     description: |
-      Logs information about the received request, such as headers and body size.
-      Body content is logged as well when debug log is enabled
+      Logs debug information about the received request, such as headers and body size.
+
 ```
