@@ -193,6 +193,32 @@ func (s *serverTestSuite) TestCapabilities_Quiet() {
 	s.Equal("/inspect", spec.Endpoints[5].Path)
 }
 
+func (s *serverTestSuite) TestCapabilities_Pretty() {
+	server := httptest.NewServer((http.HandlerFunc)(handleCapabilities))
+	s.T().Cleanup(server.Close)
+
+	client := http.Client{}
+	response, err := client.Get(server.URL + "/capabilities/?pretty=true")
+	s.Require().NoError(err)
+
+	body, err := io.ReadAll(response.Body)
+	s.Require().NoError(err)
+
+	firstlines := `{
+  "endpoints": [
+    {
+      "path": "/*",
+      "methods": [
+        "any"
+      ],
+      "contentType": "any",
+      "description": "Requests to any URL that is not defined as an endpoint are accepted if they are valid.\nThe response to any such request will be a status 200 without a body.\n"
+    },`
+	multiLine := strings.Split(string(body), "\n")
+	joinedLines := strings.Join(multiLine[:10], "\n")
+	s.Equal(firstlines, joinedLines)
+}
+
 func (s *serverTestSuite) TestConfigureReflection() {
 	server := httptest.NewServer((http.HandlerFunc)(handleConfigureReflection))
 	s.T().Cleanup(server.Close)
