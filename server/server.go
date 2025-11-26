@@ -120,7 +120,14 @@ func handleCapabilities(w http.ResponseWriter, r *http.Request) {
 		spec = quietSpec
 	}
 
-	body, err := json.Marshal(spec)
+	var body []byte
+	var err error
+	if r.URL.Query().Get("pretty") == "true" {
+		body, err = json.MarshalIndent(spec, "", "  ")
+	} else {
+		body, err = json.Marshal(spec)
+	}
+
 	if err != nil {
 		log.Fatal("Failed to marshal capabilities")
 	}
@@ -175,7 +182,7 @@ func handleInspect(w http.ResponseWriter, r *http.Request) {
 
 	logAttrs := []any{slog.String("protocol", r.Proto)}
 	logAttrs = append(logAttrs, slog.String("verb", r.Method))
-	reqURLElements := strings.Split(r.URL.String(),"/inspect")
+	reqURLElements := strings.Split(r.URL.String(), "/inspect")
 	logAttrs = append(logAttrs, slog.String("endpoint", fmt.Sprintf("/%s", strings.TrimPrefix(reqURLElements[len(reqURLElements)-1], "/"))))
 	headersAttrs := []any{}
 	keys := []string{}
