@@ -80,7 +80,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
-          driver-opts: image=moby/buildkit:master
+          # renovate depName=moby/buildkit datasource=github-releases
+          driver-opts: image=moby/buildkit@8543ce4428265d547cb009e5ad62348284497a88 # v0.29.0
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
