@@ -14,26 +14,6 @@ function "version" {
     result = regex_replace(git_tag, "^v", "")
 }
 
-function "major" {
-    params = [version]
-    result = split(".", version)[0]
-}
-
-function "minor" {
-    params = [version]
-    result = join(".", slice(split(".", version),0,2))
-}
-
-function "patch" {
-    params = [version]
-    result = join(".", slice(split(".", version),0,3))
-}
-
-function "tag" {
-    params = [tag]
-    result = [for repo in REPOS : "${repo}:${tag}"]
-}
-
 group "default" {
     targets = [
         "default",
