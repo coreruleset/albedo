@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -554,4 +555,43 @@ func (s *serverTestSuite) TestInspect_LogContent() {
 	s.Contains(logContent, "request.endpoint=/test/path")
 	s.Contains(logContent, "request.body.length.value=0")
 	s.Contains(logContent, "request.body.length.unit=B")
+}
+
+// Endpoint configuration state is package-global; concurrent requests must not race on it.
+func (s *serverTestSuite) TestConcurrentConfigurationAccess() {
+	server := httptest.NewServer(Handler())
+	s.T().Cleanup(server.Close)
+	s.T().Cleanup(func() { clear(dynamicEndpoints) })
+
+	client := http.Client{}
+	spec := `{"endpoints":[{"method":"GET","url":"/concurrent"}],"status":201}`
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 20; i++ {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			response, err := client.Post(server.URL+"/configure_reflection", "application/json", strings.NewReader(spec))
+			if s.NoError(err) {
+				s.NoError(response.Body.Close())
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			response, err := client.Get(server.URL + "/concurrent")
+			if s.NoError(err) {
+				s.NoError(response.Body.Close())
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			request, err := http.NewRequest(http.MethodPut, server.URL+"/reset", nil)
+			s.Require().NoError(err)
+			response, err := client.Do(request)
+			if s.NoError(err) {
+				s.NoError(response.Body.Close())
+			}
+		}()
+	}
+	wg.Wait()
 }
