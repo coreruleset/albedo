@@ -578,8 +578,12 @@ func (s *serverTestSuite) TestConcurrentConfigurationAccess() {
 		}()
 		go func() {
 			defer wg.Done()
+			// Racing with /reset, so the endpoint may or may not be configured:
+			// 201 when the configuration is live, 200 from the catch-all handler
+			// when it has just been discarded. Any other status is a regression.
 			response, err := client.Get(server.URL + "/concurrent")
 			if s.NoError(err) {
+				s.Contains([]int{http.StatusOK, http.StatusCreated}, response.StatusCode)
 				s.NoError(response.Body.Close())
 			}
 		}()
