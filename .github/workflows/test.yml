@@ -24,7 +24,7 @@ jobs:
           cache: true
 
       - name: Run Go Tests
-        run: go test -coverprofile=coverage.out ./...
+        run: go test -race -coverprofile=coverage.out ./...
   lint:
     runs-on: ubuntu-latest
     steps:

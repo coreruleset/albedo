@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/maphash"
 	"io"
 	"log"
 	"log/slog"
@@ -21,8 +20,7 @@ import (
 
 var capabilities *CapabilitiesSpec
 var dynamicEndpointMutex = sync.RWMutex{}
-var dynamicEndpoints = map[uint64]reflectionSpec{}
-var dynamicEndpointsHash = maphash.Hash{}
+var dynamicEndpoints = map[string]reflectionSpec{}
 
 //go:embed capabilities.yaml
 var capabilitiesDescription []byte
@@ -172,9 +170,9 @@ func handleConfigureReflection(w http.ResponseWriter, r *http.Request) {
 
 func handleReset(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Received reset request. Discarding all endpoint configurations now")
-	for k := range dynamicEndpoints {
-		delete(dynamicEndpoints, k)
-	}
+	dynamicEndpointMutex.Lock()
+	defer dynamicEndpointMutex.Unlock()
+	clear(dynamicEndpoints)
 }
 
 func handleInspect(w http.ResponseWriter, r *http.Request) {
@@ -234,11 +232,8 @@ func decodeBody(spec *reflectionSpec) (string, error) {
 	return string(bodyBytes), nil
 }
 
-func computeEndpointKey(method string, url string) uint64 {
-	dynamicEndpointsHash.Reset()
-	dynamicEndpointsHash.WriteString(method)
-	dynamicEndpointsHash.WriteString(url)
-	return dynamicEndpointsHash.Sum64()
+func computeEndpointKey(method string, url string) string {
+	return method + " " + url
 }
 
 func doReflect(w http.ResponseWriter, r *http.Request, spec *reflectionSpec) {
